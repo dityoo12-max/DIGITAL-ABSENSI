@@ -1,77 +1,80 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 
 function App() {
-  const [scanResult, setScanResult] = useState(null);
+  const [scanMessage, setScanMessage] = useState("Menunggu pemindaian...");
+  const [statusColor, setStatusColor] = useState("text-gray-500");
+  
+  const isProcessing = useRef(false);
 
   useEffect(() => {
-    // Konfigurasi dan inisialisasi scanner kamera
     const scanner = new Html5QrcodeScanner(
       "reader",
       { fps: 10, qrbox: { width: 250, height: 250 } },
       false
     );
 
-    // Fungsi yang berjalan saat QR Code berhasil terbaca
-    // Fungsi yang berjalan saat QR Code berhasil terbaca
     const onScanSuccess = async (decodedText) => {
-      setScanResult(decodedText);
+      if (isProcessing.current) return; 
       
+      isProcessing.current = true;
+      setScanMessage(`Memproses data: ${decodedText}...`);
+      setStatusColor("text-blue-600");
+
       try {
-        // TODO: Ganti URL 'http://localhost:3000/api/absensi' dengan alamat API asli buatan teman Anda
-        const response = await fetch('http://localhost:3000/api/absensi', {
-          method: 'POST', // Menggunakan metode POST untuk mengirim data baru
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          // Data yang dikirim ke server (misalnya NIS siswa dari QR Code)
-          body: JSON.stringify({
-            nis: decodedText, 
-            waktu: new Date().toISOString()
-          }),
+        const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/absensi';
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nis: decodedText, waktu: new Date().toISOString() }),
         });
 
-        const resultData = await response.json();
-
         if (response.ok) {
-          console.log("Data berhasil disimpan di database:", resultData);
-          alert("Absensi berhasil dikirim!");
+          setScanMessage(`Berhasil Absen: ${decodedText}`);
+          setStatusColor("text-green-600");
         } else {
-          console.error("Gagal menyimpan data:", resultData);
-          alert("Gagal mengirim absensi. Coba lagi.");
+          setScanMessage(`Gagal Absen: ${decodedText} (Server menolak)`);
+          setStatusColor("text-red-600");
         }
       } catch (error) {
-        console.error("Terjadi kesalahan koneksi ke server:", error);
+        setScanMessage("Gagal terhubung ke server Back-End.");
+        setStatusColor("text-red-600");
       }
+
+      setTimeout(() => {
+        isProcessing.current = false;
+        setScanMessage("Menunggu pemindaian...");
+        setStatusColor("text-gray-500");
+      }, 3000);
     };
 
-    const onScanFailure = (error) => {
-      // Dibiarkan kosong agar tidak spam error saat kamera mencari QR code
-    };
+    scanner.render(onScanSuccess, () => {});
 
-    scanner.render(onScanSuccess, onScanFailure);
-
-    // Membersihkan scanner saat halaman ditutup atau berpindah
     return () => {
       scanner.clear().catch(err => console.error("Gagal membersihkan scanner", err));
     };
   }, []);
 
   return (
-    <div style={{ textAlign: 'center', fontFamily: 'sans-serif', padding: '20px' }}>
-      <h1>Absensi Digital Kelas</h1>
-      <p>Silakan arahkan kartu QR code siswa ke kamera tablet.</p>
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4 font-sans">
+      <div className="bg-white w-full max-w-md p-6 rounded-2xl shadow-sm border border-gray-100">
+        
+        {/* Bagian Header */}
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">Digital Absensi</h1>
+          <p className="text-sm text-gray-500">Arahkan kartu QR code siswa ke kamera</p>
+        </div>
 
-      {/* Area kamera akan dirender di dalam div ini */}
-      <div id="reader" style={{ width: '100%', maxWidth: '500px', margin: '0 auto' }}></div>
+        {/* Area Scanner */}
+        <div className="rounded-xl overflow-hidden border-2 border-gray-100 bg-gray-50 mb-6 relative">
+          <div id="reader" className="w-full"></div>
+        </div>
 
-      {/* Menampilkan hasil pindaian */}
-      <div style={{ marginTop: '20px', fontSize: '18px', fontWeight: 'bold' }}>
-        {scanResult ? (
-          <span style={{ color: 'green' }}>Berhasil Absen: {scanResult}</span>
-        ) : (
-          <span style={{ color: 'gray' }}>Menunggu pemindaian...</span>
-        )}
+        {/* Indikator Status */}
+        <div className={`text-center font-medium text-lg px-4 py-3 rounded-lg bg-gray-50/50 ${statusColor}`}>
+          {scanMessage}
+        </div>
+        
       </div>
     </div>
   );
