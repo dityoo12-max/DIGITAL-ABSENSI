@@ -18,22 +18,39 @@ function App() {
       if (isProcessing.current) return; 
       
       isProcessing.current = true;
-      setScanMessage(`Memproses data: ${decodedText}...`);
+      setScanMessage(`Memproses data...`);
       setStatusColor("text-blue-600");
 
       try {
+        // Menyiapkan data yang akan dikirim (ID dan Nama)
+        let payloadData = { waktu: new Date().toISOString() };
+
+        try {
+          // Jika QR Code berisi format JSON (Contoh: {"id": "1", "nama": "Budi"})
+          const parsedData = JSON.parse(decodedText);
+          payloadData.id = parsedData.id;
+          payloadData.nama = parsedData.nama;
+        } catch (e) {
+          // Jika QR Code HANYA teks biasa/ID saja (Contoh: "101")
+          payloadData.id = decodedText;
+          payloadData.nama = "Nama tidak ada di QR"; // Info ini dikirim jika QR tidak punya nama
+        }
+
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api/absensi';
+        
         const response = await fetch(apiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ nis: decodedText, waktu: new Date().toISOString() }),
+          // Mengirim payloadData (berisi id, nama, dan waktu) ke Back-End
+          body: JSON.stringify(payloadData), 
         });
 
         if (response.ok) {
-          setScanMessage(`Berhasil Absen: ${decodedText}`);
+          // Tampilkan nama siswa di layar jika ada, atau ID jika nama tidak tersedia di QR
+          setScanMessage(`Berhasil Absen: ${payloadData.nama !== "Nama tidak ada di QR" ? payloadData.nama : payloadData.id}`);
           setStatusColor("text-green-600");
         } else {
-          setScanMessage(`Gagal Absen: ${decodedText} (Server menolak)`);
+          setScanMessage(`Gagal Absen: Ditolak oleh server`);
           setStatusColor("text-red-600");
         }
       } catch (error) {
