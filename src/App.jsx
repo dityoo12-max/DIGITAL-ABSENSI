@@ -13,9 +13,36 @@ function App() {
     );
 
     // Fungsi yang berjalan saat QR Code berhasil terbaca
-    const onScanSuccess = (decodedText) => {
+    // Fungsi yang berjalan saat QR Code berhasil terbaca
+    const onScanSuccess = async (decodedText) => {
       setScanResult(decodedText);
-      // Catatan: Di sinilah nanti Anda mengirim 'decodedText' ke API teman Anda (Back-End)
+      
+      try {
+        // TODO: Ganti URL 'http://localhost:3000/api/absensi' dengan alamat API asli buatan teman Anda
+        const response = await fetch('http://localhost:3000/api/absensi', {
+          method: 'POST', // Menggunakan metode POST untuk mengirim data baru
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          // Data yang dikirim ke server (misalnya NIS siswa dari QR Code)
+          body: JSON.stringify({
+            nis: decodedText, 
+            waktu: new Date().toISOString()
+          }),
+        });
+
+        const resultData = await response.json();
+
+        if (response.ok) {
+          console.log("Data berhasil disimpan di database:", resultData);
+          alert("Absensi berhasil dikirim!");
+        } else {
+          console.error("Gagal menyimpan data:", resultData);
+          alert("Gagal mengirim absensi. Coba lagi.");
+        }
+      } catch (error) {
+        console.error("Terjadi kesalahan koneksi ke server:", error);
+      }
     };
 
     const onScanFailure = (error) => {
